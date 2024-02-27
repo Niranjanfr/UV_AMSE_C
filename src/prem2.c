@@ -5,6 +5,9 @@
 /*_________________________________________________*/
 /* simulation d'un systeme de type "premier ordre" */
 /* (le signal d'entree est genere en "interne")    */
+/*_________________________________________________*/
+/* dans cette version, l'entree est stockee dans   */
+/* une zone de memoire partagee                    */
 /*=================================================*/
 #include <unistd.h>
 #include <stdio.h>
@@ -13,6 +16,8 @@
 #include <signal.h>
 #include <string.h>
 #include <math.h>
+#include <fcntl.h>             /* NOUVEAU */
+#include <sys/mman.h>          /* NOUVEAU */
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>          /* ->INDISPENSABLE pour les types tempo. */
@@ -24,9 +29,8 @@ double  z0,                       /* ->recurrence */
         Tu,                       /* ->periode du signal carre */
         duree,                    /* ->duree de la simulation (s) */
         Te;                       /* ->periode d'echantillonnage */
+double  *u;                       /* ->u : pointeur sur la zone partagee   */
 int     GoOn = 1;                 /* ->controle d'execution                */
-double **u;
-
 /*...................*/
 /* prototypes locaux */
 /*...................*/
@@ -62,7 +66,6 @@ void cycl_alm_handler( int signal )
 {
     static double y0     = 0.0;     /* ->y(k)                       */
     static double y1;               /* ->y(k+1)                     */
-    // static double *u      = 1.0;     /* ->signal d'entree            */
     static double t      = 0.0;     /* ->duree intercalaire         */
     static double Ttotal = 0.0;     /* ->duree totale de simulation */
     /*...............................*/
@@ -70,7 +73,7 @@ void cycl_alm_handler( int signal )
     /*...............................*/
     if( signal == SIGALRM)
     {
-        y1 = z0 * y0 + a0 * *u;
+        y1 = z0 * y0 + a0 * (*u);
         /* MAL... : printf a eviter dans les signal handler... */
         printf("%lf\t%lf\t%lf\n", Ttotal, *u, y1);
         /* preparation pour l'occurence suivante */
@@ -82,6 +85,7 @@ void cycl_alm_handler( int signal )
             GoOn = 0;
         };
         /* changement d'etat eventuel de l'entree */
+        /*
         if( t > Tu )
         {
             if( *u == 0.0)
@@ -94,6 +98,7 @@ void cycl_alm_handler( int signal )
             };
             t = 0.0;
         };
+        */
     };
 }
 /*#####################*/
@@ -125,17 +130,27 @@ int main( int argc, char *argv[])
     usage( argv[0] );
     return( 0 );
   };
+  /*................*/
   /* initialisation */
-
-  int fd;
-  fd = shm_open("Entree", O_RDWR | O_CREAT, 0600);
-  if(fd<0){
-    fprintf(stderr,"ERREUR : main() ---> appel a shm_open");
-    fprintf(stderr,"         code d'erreur %d (%s)\n", errrno, (char *)(sdterror(errno)));
+  /*................*/
+  /* creation de la zone partagee */
+  int fd;   /* ->"file descriptor" correspondant a la zone partagee */
+  fd = shm_open("ENTREE", O_RDWR | O_CREAT, 0600);
+  if( fd < 0)
+  {
+    fprintf(stderr,"ERREUR : main() ---> appel a shm_open()\n");
+    fprintf(stderr,"        code d'erreur %d (%s)\n", 
+                            errno, 
+                            (char *)(strerror(errno)));
+    return( -errno );
   };
-  ftruncate (fd,sizoef(double));
-  u = (double *)mmap(NULL,sizeof(double),PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-
+  ftruncate( fd, sizeof(double));
+  u =  (double *)mmap(NULL, 
+                      sizeof(double), 
+                      PROT_READ | PROT_WRITE, 
+                      MAP_SHARED, 
+                      fd, 
+                      0                         );
   sigemptyset( &blocked );
   memset( &sa, 0, sizeof( sigaction )); /* ->precaution utile... */
   sa.sa_handler = cycl_alm_handler;
