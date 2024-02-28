@@ -19,7 +19,7 @@
 /*............................*/
 /* constante de l'application */
 /*............................*/
-#define DEBIT       "DEBIT"
+#define CONSIGNE       "CONSIGNE"
 /*...................*/
 /* prototypes locaux */
 /*...................*/
@@ -34,12 +34,12 @@ void usage( char *pgm_name )
     exit( -1 );
   };
   printf("%s <valeur>\n", pgm_name );
-  printf("modifie la valeur du debit entrant\n");
-  printf("<valeur> : nouvelle valeur du debit entrant (m3)\n");
+  printf("modifie la valeur de la consigne\n");
+  printf("<valeur> : nouvelle valeur de la consigne(m3)\n");
   printf("\n");
   printf("exemple : \n");
   printf("%s 0.027\n", pgm_name );
-  printf("impose 0.027 comme nouvelle valeur du debit entrant\n");
+  printf("impose 0.027 comme nouvelle valeur de la consigne\n");
 }
 /*#####################*/
 /* programme principal */
@@ -47,7 +47,7 @@ void usage( char *pgm_name )
 int main( int argc, char *argv[])
 {
   double                valeur;  /* ->valeur a ecrire dans la zone  */
-  double                *qe;      /* ->pointeur sur la zone partagee */
+  double                *Yc;      /* ->pointeur sur la zone partagee */
   int                   fd;      /* ->"file descriptor" sur la zone partagee */
   /* verification des arguments */
   if( argc != 2 )
@@ -67,7 +67,7 @@ int main( int argc, char *argv[])
   /* initialisation */
   /*................*/
   /* creation de la zone partagee */
-  fd = shm_open(DEBIT, O_RDWR , 0600);
+  fd = shm_open(CONSIGNE, O_RDWR , 0600);
   if( fd < 0)
   {
     fprintf(stderr,"ERREUR : main() ---> appel a shm_open()\n");
@@ -77,13 +77,13 @@ int main( int argc, char *argv[])
     return( -errno );
   };
   ftruncate( fd, sizeof(double));
-  qe =  (double *)mmap(NULL, 
+  Yc =  (double *)mmap(NULL, 
                       sizeof(double), 
                       PROT_READ | PROT_WRITE, 
                       MAP_SHARED, 
                       fd, 
                       0                         );
-  *qe = valeur;      /* ->ecriture effective dans la zone partagee */
+  *Yc = valeur;      /* ->ecriture effective dans la zone partagee */
   close( fd );
   return( 0 );  /* ->on n'arrive pas jusque la en pratique */
 }
