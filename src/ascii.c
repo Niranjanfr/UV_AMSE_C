@@ -19,20 +19,14 @@
 /*.............................*/
 /* constantes de l'application */
 /*.............................*/
-#define     DEBIT       "DEBIT"
 #define     VOLUME      "VOLUME"
-#define     NIVEAU      "NIVEAU"
-#define     PID         "PID"
+#define     NB_ASCII    50
 /*....................*/
 /* variables globales */
 /*....................*/
-double  s,                        /* ->surface de la cuve                 */
-        *v,                       /* ->volume de fluide dans la cuve      */
-        *y,                       /* ->hauteur de fluide dans la cuve     */
-        Te,                       /* ->periode d'echantillonnage          */
+double  Te,                       /* ->periode d'echantillonnage          */
         V_MAX;                    /* ->volume maximum de la cuve          */
-double  *qe;                      /* ->qe : pointeur sur la zone partagee */
-pid_t   *pid;                     /* ->pid : pointeur sur la zone partagee*/
+double  *v;                       /* ->qe : pointeur sur la zone partagee */
 int     GoOn = 1;                 /* ->controle d'execution               */
 /*...................*/
 /* prototypes locaux */
@@ -48,16 +42,15 @@ void usage( char *pgm_name )
   {
     exit( -1 );
   };
-  printf("%s <section> <periode d'ech.> <V_MAX>\n", pgm_name );
-  printf("simule cuve de section connue.\n");
-  printf("<section>        : section de la cuve en m².\n");
-  printf("<periode d'ech.> : periode d'echantillonnage en s.\n");
+  printf("%s <V_MAX> <periode d'ech.> \n", pgm_name );
+  printf("Affiche une jauge de la cuve.\n");
   printf("<V_MAX>          : volume max en m³.\n");
+  printf("<periode d'ech.> : periode d'echantillonnage en s.\n");
   printf("\n");
   printf("exemple : \n");
-  printf("%s 0.65 0.01 100\n", pgm_name );
-  printf("simulation d'une cuve de section 0.65 m² avec une");
-  printf("periode d'echantillonnage de 0.01 s et un\n");
+  printf("%s 100 0.01\n", pgm_name );
+  printf("affichage de la cuve avec une periode");
+  printf("d'echantillonnage de 0.01 s et un\n");
   printf("volume maximum de 100m³\n");
 }
 /*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
@@ -70,16 +63,9 @@ void cycl_alm_handler( int signal )
     /*...............................*/
     if( signal == SIGALRM)
     {
-        (*v)+= Te*(*qe);
-        (*y) = (*v)/s;
+        
     };
 
-    /* arrêt du programme si la cuve atteint */
-    /* le volume max                         */
-    if((*v) > V_MAX){
-      GoOn = 0;
-      print("Volume maximum de %lfL atteint.", V_MAX);
-    }
     /*................................*/
     /* arret du processus a reception */
     /* de SIGUSR1                     */
@@ -98,21 +84,17 @@ int main( int argc, char *argv[])
                         sa_old;     /* ->ancienne config de gestion d'alarme     */
   sigset_t              blocked;    /* ->liste des signaux bloques               */
   struct itimerval      period;     /* ->periode de l'alarme cyclique            */
-  int                   fd_qe;      /* ->zone partagee DEBIT  */
   int                   fd_volume;  /* ->zone partagee VOLUME */
-  int                   fd_niveau;  /* ->zone partagee NIVEAU */
-  int                   fd_pid;     /* ->zone partagee PID */
 
   /* verification des arguments */
-  if( argc != 4 )
+  if( argc != 3 )
   {
     usage( argv[0] );
     return( 0 );
   };
   /* recuperation des arguments */
-  if( (sscanf(argv[1],"%lf", &s     ) == 0)||
-      (sscanf(argv[2],"%lf", &Te    ) == 0)||
-      (sscanf(argv[3],"%lf", &V_MAX    ) == 0)   )  
+  if( (sscanf(argv[1],"%lf", &V_MAX ) == 0)||
+      (sscanf(argv[2],"%lf", &Te    ) == 0)   )  
   {
     printf("ERREUR : probleme de format des arguments\n");
     printf("         passe en ligne de commande.\n");
@@ -122,16 +104,12 @@ int main( int argc, char *argv[])
 
 
   //Vérification des arguments
-  if(s<=0){
-    printf("La section ne peut pas être inférieure ou égale à 0.\n");
+  if(V_MAX<=0){
+    printf("Le volume max ne peut pas être inférieur ou égal à 0.\n");
     return 0;
   }
   if(Te<=0){
     printf("La période d'échantillonage ne peut pas être inférieure ou égale à 0.\n");
-    return 0;
-  }
-  if(V_MAX<=0){
-    printf("Le volume max ne peut pas être inférieur ou égal à 0.\n");
     return 0;
   }
 
@@ -140,24 +118,6 @@ int main( int argc, char *argv[])
   /* initialisation */
   /*................*/
   /* creation des zones partagees */
-  /*           --->DEBIT<-----    */
-  printf("zone DEBIT\n");
-  fd_qe = shm_open(DEBIT, O_RDWR | O_CREAT, 0600);
-  if( fd_qe < 0)
-  {
-    fprintf(stderr,"ERREUR : main() ---> appel a shm_open() NIVEAU\n");
-    fprintf(stderr,"        code d'erreur %d (%s)\n", 
-                            errno, 
-                            (char *)(strerror(errno)));
-    return( -errno );
-  };
-  ftruncate( fd_qe, sizeof(double));
-  qe =  (double *)mmap(NULL, 
-                      sizeof(double), 
-                      PROT_READ, 
-                      MAP_SHARED, 
-                      fd_qe, 
-                      0                         );
   /*         --->VOLUME<---            */
   printf("zone VOLUME\n");
   fd_volume = shm_open(VOLUME, O_RDWR | O_CREAT, 0600);
@@ -176,45 +136,6 @@ int main( int argc, char *argv[])
                       MAP_SHARED, 
                       fd_volume, 
                       0                         );
-  /*         --->NIVEAU<---            */
-  printf("zone NIVEAU\n");
-  fd_niveau = shm_open(NIVEAU, O_RDWR | O_CREAT, 0600);
-  if( fd_niveau < 0)
-  {
-    fprintf(stderr,"ERREUR : main() ---> appel a shm_open() NIVEAU\n");
-    fprintf(stderr,"        code d'erreur %d (%s)\n", 
-                            errno, 
-                            (char *)(strerror(errno)));
-    return( -errno );
-  };
-  ftruncate( fd_niveau, sizeof(double));
-  y =  (double *)mmap(NULL, 
-                      sizeof(double), 
-                      PROT_READ | PROT_WRITE, 
-                      MAP_SHARED, 
-                      fd_niveau, 
-                      0                         );
-  /*           --->PID<-----    */
-  fd_pid = shm_open(PID, O_RDWR | O_CREAT, 0600);
-  if( fd_pid < 0)
-  {
-      fprintf(stderr,"ERREUR : main() ---> appel a shm_open() PID\n");
-      fprintf(stderr,"        code d'erreur %d (%s)\n", 
-                              errno, 
-                              (char *)(strerror(errno)));
-      return( -errno );
-  };
-  ftruncate( fd_pid, sizeof(double));
-  pid =  (pid_t *)mmap(NULL, 
-                      sizeof(pid_t), 
-                      PROT_READ | PROT_WRITE,
-                      MAP_SHARED, 
-                      fd_pid,
-                      0              );//Only the first double of the memory
-
-
-  //Sauvegarde du PID
-  *pid = getpid();
 
   sigemptyset( &blocked );
   memset( &sa, 0, sizeof( sigaction )); /* ->precaution utile... */
@@ -233,18 +154,26 @@ int main( int argc, char *argv[])
   period.it_value.tv_usec    = (int)((Te - (int)(Te))*1e6);
   /* demarrage de l'alarme */
   setitimer( ITIMER_REAL, &period, NULL );
+  
   /* on ne fait desormais plus rien d'autre que */
   /* d'attendre les signaux                     */
-  printf("SIMULATION :\n");
   do
   {
     pause();
-    printf("qe = %lf\t v = %lf y = %lf\n", *qe, *v, *y);
+    //Clear screen
+    system("clear");
+    //Print cuve
+    int nbRempli = (int)((*v) / V_MAX * NB_ASCII);
+    for(int i=0; i< nbRempli; i++){
+        printf("#");
+    }
+    for(int i=0; i<NB_ASCII-nbRempli; i++){
+        printf("_");
+    }
+    printf("\n");
   }
   while( GoOn == 1 );
   /* menage */
-  close(fd_qe);
-  close(fd_niveau);
   close(fd_volume);
   /* fini */
   printf("FIN.\n");
