@@ -63,6 +63,14 @@ int main( int argc, char *argv[])
     usage( argv[0] );
     return( 0 );
   };
+
+  //Vérification des arguments
+  if(valeur<=0){
+      printf("La consigne de niveau doit être strictement positive\n");
+      return 0;
+  }
+
+
   /*................*/
   /* initialisation */
   /*................*/

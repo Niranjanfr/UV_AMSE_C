@@ -108,6 +108,19 @@ int main( int argc, char *argv[])
         usage( argv[0] );
         return( 0 );
     };
+
+    //Vérification des arguments
+    if(K<=0){
+        printf("Pour que le régulateur fonctionne correctement,\n");
+        printf("le gain doit être strictement positif.\n");
+        return 0;
+    }
+    if(Te<=0){
+        printf("La période d'échantillonage ne peut pas être inférieure ou égale à 0.\n");
+        return 0;
+    }
+
+
     /*................*/
     /* initialisation */
     /*................*/

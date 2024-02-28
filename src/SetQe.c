@@ -49,6 +49,7 @@ int main( int argc, char *argv[])
   double                valeur;  /* ->valeur a ecrire dans la zone  */
   double                *qe;      /* ->pointeur sur la zone partagee */
   int                   fd;      /* ->"file descriptor" sur la zone partagee */
+  
   /* verification des arguments */
   if( argc != 2 )
   {
@@ -63,6 +64,14 @@ int main( int argc, char *argv[])
     usage( argv[0] );
     return( 0 );
   };
+
+  //Vérification des arguments
+  if(valeur<=0){
+      printf("La consigne de débit doit être strictement positive\n");
+      return 0;
+  }
+
+
   /*................*/
   /* initialisation */
   /*................*/
