@@ -122,7 +122,7 @@ int main( int argc, char *argv[])
   ftruncate( fd_qe, sizeof(double));
   qe =  (double *)mmap(NULL, 
                       sizeof(double), 
-                      PROT_READ | PROT_WRITE, 
+                      PROT_READ, 
                       MAP_SHARED, 
                       fd_qe, 
                       0                         );
