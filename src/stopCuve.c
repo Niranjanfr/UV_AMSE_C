@@ -21,53 +21,52 @@
 /*.............................*/
 /* constantes de l'application */
 /*.............................*/
-#define     PID         "PID"
+#define     STOP         "STOP"
 
 /*....................*/
 /* variables globales */
 /*....................*/
-pid_t  *pid;                     /* ->pid : pointeur sur deuxième partie de la zone partagee  */
+int  *stop;                     /* ->stop : pointeur sur deuxième partie de la zone partagee  */
 
 /*#####################*/
 /* programme principal */
 /*#####################*/
 int main( int argc, char *argv[])
 {
-    int                   fd_pid;     /* ->zone partagee PID */
+    int                   fd_stop;     /* ->zone partagee stop */
 
     /*................*/
     /* initialisation */
     /*................*/
     /* lecture des zones partagees */
-    /*           --->PID<-----    */
-    fd_pid = shm_open(PID, O_RDWR | O_CREAT, 0600);
-    if( fd_pid < 0)
+    /*           --->KILL<-----    */
+    fd_stop = shm_open(STOP, O_RDWR | O_CREAT, 0600);
+    if( fd_stop < 0)
     {
-        fprintf(stderr,"ERREUR : main() ---> appel a shm_open() PID\n");
+        fprintf(stderr,"ERREUR : main() ---> appel a shm_open() STOP\n");
         fprintf(stderr,"        code d'erreur %d (%s)\n", 
                                 errno, 
                                 (char *)(strerror(errno)));
         return( -errno );
     };
-    ftruncate( fd_pid, sizeof(double));
-    pid =  (pid_t *)mmap(NULL, 
-                        sizeof(pid_t)*2, 
-                        PROT_READ, 
+    ftruncate( fd_stop, sizeof(int));
+    stop =  (int *)mmap(NULL, 
+                        sizeof(int), 
+                        PROT_READ | PROT_WRITE, 
                         MAP_SHARED, 
-                        fd_pid,
-                        0               );//Both doubles of the memory
-
-
-    //Lecture des PID
-    pid_t pidCuve = *pid;
-    pid_t pidReg = *(pid + 1);
+                        fd_stop,
+                        0               );
 
     //Arrêt des processus
-    kill(pidCuve, SIGUSR1);
-    kill(pidReg, SIGUSR1);
+    *stop = 1;
+
+    //On attend un peu puis on remet stop à sa valeur initiale
+    sleep(2);
+
+    *stop = 0;
 
     //Arrêt des fd
-    close(fd_pid);
+    close(fd_stop);
     
     /* fini */
     printf("FIN.\n");

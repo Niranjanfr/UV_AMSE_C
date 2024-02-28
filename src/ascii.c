@@ -20,14 +20,16 @@
 /* constantes de l'application */
 /*.............................*/
 #define     VOLUME      "VOLUME"
+#define     STOP        "STOP"
 #define     NB_ASCII    50
 /*....................*/
 /* variables globales */
 /*....................*/
-double  Te,                       /* ->periode d'echantillonnage          */
-        V_MAX;                    /* ->volume maximum de la cuve          */
-double  *v;                       /* ->qe : pointeur sur la zone partagee */
-int     GoOn = 1;                 /* ->controle d'execution               */
+double  Te,                       /* ->periode d'echantillonnage            */
+        V_MAX;                    /* ->volume maximum de la cuve            */
+double  *v;                       /* ->qe : pointeur sur la zone partagee   */
+int     GoOn = 1;                 /* ->controle d'execution                 */
+int     *stop;                    /* ->stop : pointeur sur la zone partagee */      
 /*...................*/
 /* prototypes locaux */
 /*...................*/
@@ -58,19 +60,11 @@ void usage( char *pgm_name )
 /*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
 void cycl_alm_handler( int signal )
 {
-    /*...............................*/
-    /* mise a jour entree / sortie : */
-    /*...............................*/
-    if( signal == SIGALRM)
-    {
-        
-    };
-
     /*................................*/
     /* arret du processus a reception */
     /* de SIGUSR1                     */
     /*................................*/
-    if( signal == SIGUSR1)
+    if( signal == SIGUSR1 || *stop == 1)
     {
         GoOn = 0;
     };
@@ -84,7 +78,8 @@ int main( int argc, char *argv[])
                         sa_old;     /* ->ancienne config de gestion d'alarme     */
   sigset_t              blocked;    /* ->liste des signaux bloques               */
   struct itimerval      period;     /* ->periode de l'alarme cyclique            */
-  int                   fd_volume;  /* ->zone partagee VOLUME */
+  int                   fd_volume,  /* ->zone partagee VOLUME */
+                        fd_stop;    /* ->zone partagee STOP */
 
   /* verification des arguments */
   if( argc != 3 )
@@ -136,6 +131,24 @@ int main( int argc, char *argv[])
                       MAP_SHARED, 
                       fd_volume, 
                       0                         );
+
+    /*           --->STOP<-----    */
+    fd_stop = shm_open(STOP, O_RDWR | O_CREAT, 0600);
+    if( fd_stop < 0)
+    {
+        fprintf(stderr,"ERREUR : main() ---> appel a shm_open() STOP\n");
+        fprintf(stderr,"        code d'erreur %d (%s)\n", 
+                                errno, 
+                                (char *)(strerror(errno)));
+        return( -errno );
+    };
+    ftruncate( fd_stop, sizeof(int));
+    stop =  (int *)mmap(NULL, 
+                        sizeof(int), 
+                        PROT_READ,
+                        MAP_SHARED, 
+                        fd_stop,
+                        0               );//Only the second double of the memory
 
   sigemptyset( &blocked );
   memset( &sa, 0, sizeof( sigaction )); /* ->precaution utile... */
