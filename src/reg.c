@@ -24,6 +24,7 @@
 #define     DEBIT       "DEBIT"
 #define     NIVEAU      "NIVEAU"
 #define     CONSIGNE    "CONSIGNE"
+#define     PID         "PID"
 /*....................*/
 /* variables globales */
 /*....................*/
@@ -32,6 +33,7 @@ double  *y,                       /* ->hauteur de fluide dans la cuve         */
         K,                        /* ->gain du régulateur                     */
         Te;                       /* ->periode d'echantillonnage              */
 double  *qe;                      /* ->qe : pointeur sur la zone partagee     */
+pid_t   *pid;                     /* ->pid : pointeur sur deuxième partie de la zone partagee  */
 int     GoOn = 1;                 /* ->controle d'execution                   */
 /*...................*/
 /* prototypes locaux */
@@ -91,6 +93,7 @@ int main( int argc, char *argv[])
     int                   fd_qe;      /* ->zone partagee DEBIT  */
     int                   fd_niveau;  /* ->zone partagee NIVEAU */
     int                   fd_consigne;/* ->zone partagee CONSIGNE */
+    int                   fd_pid;     /* ->zone partagee PID */
     
     /* verification des arguments */
     if( argc != 3 )
@@ -176,7 +179,28 @@ int main( int argc, char *argv[])
                         MAP_SHARED, 
                         fd_consigne, 
                         0                         );
+    /*           --->PID<-----    */
+    fd_pid = shm_open(PID, O_RDWR | O_CREAT, 0600);
+    if( fd_pid < 0)
+    {
+        fprintf(stderr,"ERREUR : main() ---> appel a shm_open() PID\n");
+        fprintf(stderr,"        code d'erreur %d (%s)\n", 
+                                errno, 
+                                (char *)(strerror(errno)));
+        return( -errno );
+    };
+    ftruncate( fd_pid, sizeof(double));
+    pid =  (pid_t *)mmap(NULL, 
+                        sizeof(pid_t)*2, 
+                        PROT_READ | PROT_WRITE,
+                        MAP_SHARED, 
+                        fd_pid,
+                        0               );//Only the second double of the memory
 
+
+    //Sauvegarde du PID
+    *(pid+1) = getpid();
+    printf("PID : %d", *(pid+1));
 
 
     /*Définition des signaux*/
@@ -187,6 +211,7 @@ int main( int argc, char *argv[])
     sa.sa_mask    = blocked;
     /* installation du gestionnaire de signal */
     sigaction(SIGALRM, &sa, NULL );
+    sigaction(SIGUSR1, &sa, NULL );
     /* initialisation de l'alarme  */
     period.it_interval.tv_sec  = (int)(Te);  
     period.it_interval.tv_usec = (int)((Te - (int)(Te))*1e6);
@@ -211,6 +236,7 @@ int main( int argc, char *argv[])
     close(fd_qe);
     close(fd_niveau);
     close(fd_consigne);
+    close(fd_pid);
     
     /* fini */
     printf("FIN.\n");
