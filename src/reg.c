@@ -200,7 +200,6 @@ int main( int argc, char *argv[])
 
     //Sauvegarde du PID
     *(pid+1) = getpid();
-    printf("PID : %d", *(pid+1));
 
 
     /*Définition des signaux*/

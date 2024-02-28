@@ -29,7 +29,8 @@
 double  s,                        /* ->surface de la cuve                 */
         *v,                       /* ->volume de fluide dans la cuve      */
         *y,                       /* ->hauteur de fluide dans la cuve     */
-        Te;                       /* ->periode d'echantillonnage          */
+        Te,                       /* ->periode d'echantillonnage          */
+        V_MAX;                    /* ->volume maximum de la cuve          */
 double  *qe;                      /* ->qe : pointeur sur la zone partagee */
 pid_t   *pid;                     /* ->pid : pointeur sur la zone partagee*/
 int     GoOn = 1;                 /* ->controle d'execution               */
@@ -47,15 +48,17 @@ void usage( char *pgm_name )
   {
     exit( -1 );
   };
-  printf("%s <section> <periode d'ech.>\n", pgm_name );
+  printf("%s <section> <periode d'ech.> <V_MAX>\n", pgm_name );
   printf("simule cuve de section connue.\n");
   printf("<section>        : section de la cuve en m².\n");
   printf("<periode d'ech.> : periode d'echantillonnage en s.\n");
+  printf("<V_MAX>          : volume max en m³.\n");
   printf("\n");
   printf("exemple : \n");
-  printf("%s 0.65 0.01\n", pgm_name );
+  printf("%s 0.65 0.01 100\n", pgm_name );
   printf("simulation d'une cuve de section 0.65 m² avec une");
-  printf("periode d'echantillonnage de 0.01 s\n");
+  printf("periode d'echantillonnage de 0.01 s et un\n");
+  printf("volume maximum de 100m³\n");
 }
 /*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
 /* gestionnaire de l'alarme cyclique */
@@ -70,6 +73,13 @@ void cycl_alm_handler( int signal )
         (*v)+= Te*(*qe);
         (*y) = (*v)/s;
     };
+
+    /* arrêt du programme si la cuve atteint */
+    /* le volume max                         */
+    if((*v) > V_MAX){
+      GoOn = 0;
+      print("Volume maximum de %lfL atteint.", V_MAX);
+    }
     /*................................*/
     /* arret du processus a reception */
     /* de SIGUSR1                     */
@@ -94,14 +104,15 @@ int main( int argc, char *argv[])
   int                   fd_pid;     /* ->zone partagee PID */
 
   /* verification des arguments */
-  if( argc != 3 )
+  if( argc != 4 )
   {
     usage( argv[0] );
     return( 0 );
   };
   /* recuperation des arguments */
   if( (sscanf(argv[1],"%lf", &s     ) == 0)||
-      (sscanf(argv[2],"%lf", &Te    ) == 0)   )  
+      (sscanf(argv[2],"%lf", &Te    ) == 0)||
+      (sscanf(argv[3],"%lf", &V_MAX    ) == 0)   )  
   {
     printf("ERREUR : probleme de format des arguments\n");
     printf("         passe en ligne de commande.\n");
@@ -200,11 +211,6 @@ int main( int argc, char *argv[])
 
   //Sauvegarde du PID
   *pid = getpid();
-  printf("PID : %d", *pid);
-
-
-
-
 
   sigemptyset( &blocked );
   memset( &sa, 0, sizeof( sigaction )); /* ->precaution utile... */
